@@ -11,7 +11,7 @@ spolehlivostí a udržitelností.
 - PoC s Effort ukončit. Investovat čas do SQLite + unit testů místo dalších 20+ hodin ladění zastaralé knihovny/metody.
 
 **Hlavní důvody:**
-- Legacy technologie bez podpory
+- Projekt bez aktivního vývoje/Zastaralá knihovna bez podpory EF Core
 - Minimální dokumentace
 - Téměr žádná podpora od komunity
 - Žádná podpora pro EF Core (nemožnost migrace na EF core v budoucnu)

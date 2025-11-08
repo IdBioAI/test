@@ -7,11 +7,14 @@
 **Cíl:** Zrychlit integration testy pomocí in-memory databáze a odpojit od DEV Azure DB s lepší 
 spolehlivostí a udržitelností.
 
-**Výsledek:** Effort není použitelný pro tento projekt nebo jiné enterprise projekty.
-- PoC s Effort ukončit. Investovat čas do SQLite + unit testů místo dalších 20+ hodin ladění zastaralé knihovny/metody.
+**Výsledek:** Effort není použitelný pro tento projekt nebo jiné enterprise projekty. In-memory databáze jako Effort mají své místo v software vývoji - fungují skvěle pro malé projekty nebo rychlé unit testy. Projekt s 150 tabulkami je však příliš velký a komplexní pro tuto technologii.
+
+- PoC s Effort ukončit
+- Investovat čas do Testcontainers + reálného SQL Serveru (případně jiného řešení) místo dalšího ladění nevhodné knihovny 
+- Pro rychlé unit testy business logiky použít Repository pattern + NSubstitute
 
 **Hlavní důvody:**
-- Projekt bez aktivního vývoje/Zastaralá knihovna bez podpory EF Core
+- Opuštěný projekt bez aktivního vývoje
 - Minimální dokumentace
 - Téměr žádná podpora od komunity
 - Žádná podpora pro EF Core (nemožnost migrace na EF core v budoucnu)
@@ -23,7 +26,7 @@ spolehlivostí a udržitelností.
 - Výkonnostní problémy už při stovkách testů (https://github.com/zzzprojects/EntityFramework-Effort/issues/93), a Microsoft sám doporučuje nepoužívat in-memory providery. Pro projekt s 150 tabulkami doporučuji Testcontainers s reálným SQL Serverem - industry standard.
 - Minimální zrychlení testů. U testované třídy "AccountControllerTests" byl Effort o 2-3 sekundy rychlejší. To může
 být ale způsobeno pomalejším internetem (připojování se do Azure DB).
-- Za rok nebo dva budeme nuceni vše předělat.
+- Za rok nebo dva budeme nuceni vše předělat (investment do Effort = technologický dluh).
 
 Zdroje:
 - https://learn.microsoft.com/en-us/ef/core/testing/testing-without-the-database

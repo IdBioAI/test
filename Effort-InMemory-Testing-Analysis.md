@@ -12,6 +12,13 @@ spolehlivostí a udržitelností.
 - PoC s Effort ukončit
 - Investovat čas do Testcontainers + reálného SQL Serveru (případně jiného řešení) místo dalšího ladění nevhodné knihovny 
 - Pro rychlé unit testy business logiky použít Repository pattern + NSubstitute
+- Alternativně pro jednoduché integration testy: SQLite in-memory (reálná databáze v RAM, ne fake provider)
+  
+**Poznámka k SQLite in-memory:**
+Ačkoliv Microsoft doporučuje SQLite in-memory jako náhradu za EF InMemory provider,
+pro projekt s 150 tabulkami a komplexními SQL Server features (stored procedures,
+specifické datové typy, atd.) není SQLite vhodná náhrada. SQLite má jiný SQL dialekt
+a nepodporuje všechny SQL Server features. Možná použít v kombinaci s jinou metodou.
 
 **Hlavní důvody:**
 - Opuštěný projekt bez aktivního vývoje

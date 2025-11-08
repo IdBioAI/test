@@ -20,6 +20,7 @@ spolehlivostí a udržitelností.
 - Vyžaduje masivní refactoring 150+ factories včetně samostatných linkerů dat
 - Microsoft a další zdroje (včetně Jimmy Bogard) uvádí, že in-memory testy jsou nevyhovující
 - Effort knihovna je použitelná pro malé projekty se starším .NET frameworkem
+- Effort je zastaralý projekt bez podpory EF Core, má dokumentované výkonnostní problémy už při stovkách testů, a Microsoft sám doporučuje nepoužívat in-memory providery.Pro projekt s 150 tabulkami doporučuji Testcontainers s reálným SQL Serverem - industry standard.
 - Minimální zrychlení testů. U testované třídy "AccountControllerTests" byl Effort o 2-3 sekundy rychlejší. To může
 být ale způsobeno pomalejším internetem (připojování se do Azure DB). 
 

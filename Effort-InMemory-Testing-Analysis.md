@@ -8,6 +8,7 @@
 spolehlivostí a udržitelností.
 
 **Výsledek:** Effort není použitelný pro tento projekt nebo jiné enterprise projekty.
+- PoC s Effort ukončit. Investovat čas do SQLite + unit testů místo dalších 20+ hodin ladění zastaralé knihovny/metody.
 
 **Hlavní důvody:**
 - Legacy technologie bez podpory

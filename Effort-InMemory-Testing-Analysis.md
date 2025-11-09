@@ -70,7 +70,7 @@ Hlavní výhody:
       - Příklad: User.LanguageId = 1 → User.Language = LanguageFactory.Entities.First()
 - Pro zrychlení příkazu  ``` schemaContext.Database.CreateIfNotExists();``` vytvořit samostatné EntitiesContext. Tímto
 by se vytvořilo schéma, které by mělo pouze potřebné tabulky a ne celá DB (150+ tabulek). Např. třída AccountControllerTests
-vyžaduje pouze 10 tabulek. Jednalo by se ale o velmi časově náročnou operaci.
+vyžaduje pouze 10 tabulek. Jednalo by se ale o velmi časově náročnou operaci. (UPDATE: viz 7. Pokus 4: Simplified Context (Pouze 10 Tabulek) -> simplified context je neproveditelný)
 
 **Rizika**
 - Objevení dalších Effort problémů během implementace
@@ -520,6 +520,172 @@ Assert.AreEqual(5, person.Id); // Funguje!
 **Výsledek:** **Effort nelze použít pro tento use case**
 
 ---
+
+## 7. Pokus 4: Simplified Context (Pouze 10 Tabulek)
+
+### Strategie
+
+Poslední pokus: Vytvořit **zjednodušený context** s pouze 10 tabulkami potřebnými pro AccountController testy, aby `CreateIfNotExists()` bylo rychlejší.
+
+**Hypotéza:** 10 tabulek = rychlejší schema creation než 150+ tabulek.
+
+```csharp
+public class DokladEntitiesContextAccountControllerTest : DokladEntitiesContext
+{
+    protected override void OnModelCreating(DbModelBuilder modelBuilder)
+    {
+        // Register ONLY 10 entity mappings (not 150+)
+        modelBuilder.Configurations.Add(new CurrencyMap());
+        modelBuilder.Configurations.Add(new LanguageMap());
+        modelBuilder.Configurations.Add(new CountryMap());
+        modelBuilder.Configurations.Add(new UserMap());
+        modelBuilder.Configurations.Add(new AgendumMap());
+        modelBuilder.Configurations.Add(new ContactMap());
+        modelBuilder.Configurations.Add(new BillingAgendaMap());
+        modelBuilder.Configurations.Add(new UserAgendaMap());
+        modelBuilder.Configurations.Add(new User2faAuthenticatorMap());
+        modelBuilder.Configurations.Add(new User2faBackupCodeMap());
+
+        // DO NOT call base.OnModelCreating()
+    }
+}
+```
+
+### První Chyba: DeveloperUser Has No Key Defined
+
+```
+System.Data.Entity.ModelConfiguration.ModelValidationException:
+EntityType 'DeveloperUser' has no key defined.
+```
+
+**Problém:** I když registrujeme jen 10 mappings, EF vidí **všechny DbSet properties** (140+) zděděné z `DokladEntitiesContext` a snaží se je zmapovat pomocí conventions.
+
+**Řešení:** Explicitně ignorovat všechny ostatní entity pomocí reflection:
+
+```csharp
+protected override void OnModelCreating(DbModelBuilder modelBuilder)
+{
+    // Define entities to KEEP
+    var entitiesToKeep = new HashSet<Type>
+    {
+        typeof(Currency), typeof(Language), typeof(Country),
+        typeof(User), typeof(Agenda), typeof(Contact),
+        typeof(BillingAgenda), typeof(UserAgenda),
+        typeof(User2faAuthenticator), typeof(User2faBackupCode)
+    };
+
+    // IGNORE all other entities using reflection
+    var dbSetProperties = typeof(DokladEntitiesContext)
+        .GetProperties()
+        .Where(p => p.PropertyType.IsGenericType &&
+                    p.PropertyType.GetGenericTypeDefinition() == typeof(IDbSet<>));
+
+    foreach (var prop in dbSetProperties)
+    {
+        var entityType = prop.PropertyType.GetGenericArguments()[0];
+        if (!entitiesToKeep.Contains(entityType))
+        {
+            // modelBuilder.Ignore<TEntity>()
+            var ignoreMethod = typeof(DbModelBuilder).GetMethod("Ignore", new Type[] { });
+            ignoreMethod.MakeGenericMethod(entityType).Invoke(modelBuilder, null);
+        }
+    }
+
+    // Register our 10 mappings
+    modelBuilder.Configurations.Add(new CurrencyMap());
+    // ...
+}
+```
+
+### Druhá Chyba: Navigation Properties Na Ignorované Entity
+
+```
+System.InvalidOperationException:
+The navigation property 'CashVoucherDefaultReportColorHc' is not a declared
+property on type 'Agenda'. Verify that it has not been explicitly excluded
+from the model and that it is a valid navigation property.
+```
+
+**Problém:** `Agenda` má **17+ navigation properties** na jiné entity:
+
+```csharp
+// AgendumMap.cs
+this.HasOptional(t => t.CashVoucherDefaultReportColorHc)
+    .WithMany()
+    .HasForeignKey(d => d.CashVoucherDefaultReportColorHcId);
+
+this.HasOptional(t => t.DefaultReportColor)
+    .WithMany()
+    .HasForeignKey(d => d.DefaultReportColorId);
+
+this.HasOptional(t => t.ConstantSymbol)
+    .WithMany()
+    .HasForeignKey(d => d.ConstantSymbolId);
+
+this.HasOptional(t => t.NaceCode)
+    .WithMany()
+    .HasForeignKey(d => d.NaceCodeId);
+
+this.HasOptional(t => t.PaymentOption)
+    .WithMany()
+    .HasForeignKey(d => d.PaymentOptionId);
+
+this.HasOptional(t => t.TaxOffice)
+    .WithMany()
+    .HasForeignKey(d => d.TaxOfficeId);
+
+// ... 11 dalších
+```
+
+**Analýza závislostí:**
+```
+Agenda → CashVoucherDefaultReportColorHc (ReportColor)
+      → DefaultReportColor (ReportColor)
+      → DefaultReportColorHc (ReportColor)
+      → ProformaDefaultReportColor (ReportColor)
+      → ProformaDefaultReportColorHc (ReportColor)
+      → ConstantSymbol
+      → NaceCode
+      → PaymentOption
+      → TaxOffice
+      → VatCodeIssuedInvoice (VatCode)
+      → VatCodeReceivedInvoice (VatCode)
+      → AgendaExtension
+
+Contact → 5+ navigation properties
+User → 3+ navigation properties
+Country → ExchangeList
+```
+
+**Celkový počet závislostí:** 30-50+ tabulek místo původních 10!
+
+### Kaskádový Efekt Závislostí
+
+```
+Plán: 10 tabulek
+├─ Currency (leaf)
+├─ Language (leaf)
+├─ Country → ExchangeList (missing)
+├─ User 
+├─ Agenda → ReportColor (5×) 
+│         → ConstantSymbol 
+│         → NaceCode 
+│         → PaymentOption 
+│         → TaxOffice 
+│         → VatCode (2×) 
+│         → AgendaExtension 
+│         = 12 dalších tabulek
+├─ Contact → další závislosti 
+├─ BillingAgenda 
+├─ UserAgenda 
+├─ User2faAuthenticator 
+└─ User2faBackupCode 
+
+Reálný požadavek: 40-50 tabulek místo 10
+```
+
+### Závěr: Simplified Context Je Neproveditelný
+
 
 ## 10. Co Částečně Fungovalo
 
